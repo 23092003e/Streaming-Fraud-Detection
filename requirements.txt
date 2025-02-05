@@ -1,0 +1,7 @@
+# requirements.txt
+pyspark==3.3.0
+kafka-python==2.0.2
+cassandra-driver==3.25.0
+pandas==2.2.3
+numpy==1.26.4
+
