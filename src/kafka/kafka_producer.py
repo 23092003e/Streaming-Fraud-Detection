@@ -1,14 +1,23 @@
-from kafka.admin import KafkaAdminClient, NewTopic
-from kafka.errors import TopicAlreadyExistsError
+from kafka import KafkaProducer
+import pandas as pd
+import json
+import time
 
-# Kafka broker settings
-bootstrap_servers = 'localhost:9092'
-
-admin_client = KafkaAdminClient(
-    bootstrap_servers=bootstrap_servers, 
-    client_id='test'
+producer = KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda x: json.dumps(x).encode('utf-8')
 )
 
-topic_list = []
-topic_list.append(NewTopic(name="example_topic", num_partitions=1, replication_factor=1))
-admin_client.create_topics(new_topics=topic_list, validate_only=False)
+file_path = r'D:\Data Science\Big Data Technology\Project\Streaming-Fraud-Detection\Streaming-Fraud-Detection\data\processed\clean_train.csv'
+df = pd.read_csv(file_path)
+
+for _, row in df.iterrows():
+    message = row.to_dict()
+    
+    producer.send('fraud-detection', value=message)
+    print(f"Sent: {message}")
+    
+    time.sleep(1)
+
+producer.flush()
+producer.close()

@@ -1,30 +1,17 @@
-# Base image
+# Sử dụng image Python làm base
 FROM python:3.9-slim
 
-# Set working directory
+# Thiết lập thư mục làm việc trong container
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libssl-dev \
-    libffi-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements file
+# Sao chép file requirements.txt vào container
 COPY requirements.txt .
 
-# Install Python dependencies
+# Cài đặt các thư viện Python cần thiết
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Sao chép toàn bộ mã nguồn vào container
 COPY . .
 
-# Expose ports for Kafka, Spark, and Cassandra
-EXPOSE 9092 7077 9042
-
-# Default command
-CMD ["python", "src/kafka_producer/producer.py"]
+# Command để chạy script Python
+CMD ["python", "producer.py"]
