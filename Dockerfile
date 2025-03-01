@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Command để chạy script Python
-CMD ["python", "producer.py"]
+CMD ["python", "kafka_producer.py", "kafka_consumer.py"]
