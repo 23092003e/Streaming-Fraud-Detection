@@ -27,13 +27,13 @@ try:
             
             if len(batch) >= batch_size:
                 producer.send('fraud_detection', value=batch)
-                print(f"[Producer] Sent batch of {batch_size} messages.")
+                print(f"📤 Sent {len(batch_size)} messages to Kafka")
                 batch = []
-                time.sleep(0.5)
+                time.sleep(1)
                 
     if batch:
         producer.send('fraud_detection', value=batch)
-        print(f"[Producer] Sent final batch of {len(batch)} messages")
+        print(f" 📤 [Producer] Sent final batch of {len(batch)} messages")
         
 except Exception as e:
     print(f"[Producer] An error occurred: {e}")
