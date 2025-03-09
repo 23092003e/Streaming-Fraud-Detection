@@ -1,10 +1,9 @@
-from kafka import KafkaConsumer
 import json
 import logging
 import time
 import signal
 import sys
-
+from kafka import KafkaConsumer
 # Cấu hình logging: Log các thông tin nhận được vào file kafka_consumer.csv
 logging.basicConfig(
     filename='kafka_consumer.csv',
