@@ -1,63 +1,103 @@
 from kafka import KafkaConsumer
 import json
-import pandas as pd
 import logging
 import time
+import signal
+import sys
 
-# Set up logging
+# Cấu hình logging: Log các thông tin nhận được vào file kafka_consumer.csv
 logging.basicConfig(
     filename='kafka_consumer.csv',
     level=logging.INFO,
     format='%(asctime)s - [Consumer] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
-    
-    
-)   
+)
 
+# Hàm xử lý tín hiệu dừng ứng dụng (Ctrl+C hoặc SIGTERM)
+def signal_handler(sig, frame):
+    print("[Consumer] Shutting down gracefully...")
+    consumer.close()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+# Kết nối đến Kafka broker; nếu kết nối thất bại thì thử lại sau 2 giây
 while True:
     try:
         consumer = KafkaConsumer(
-            "fraud-Detection",
-            bootstrap_servers='localhost:9092',
+            "fraud-detection",              # Tên topic (khớp với producer)
+            bootstrap_servers='localhost:29092',  # Sử dụng port 29092 cho kết nối từ host
             value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-            auto_offset_reset = 'earliest',
-            group_id = "fraud-detection-group"
-            
+            auto_offset_reset='earliest',
+            enable_auto_commit=True,        # Tự động commit offset sau khi xử lý
+            group_id="fraud-detection-group"
         )
-        print("[Consumer] Listening for messages ....")
+        print("[Consumer] Listening for messages ...")
         break
     except Exception as e:
-        print(f'[Error] Kafka Consumer failed: {e}!')
-        
+        print(f"[Error] Kafka Consumer failed: {e}!")
         time.sleep(2)
 
-batch = []
-batch_size = 500
+batch = []       # Danh sách lưu trữ các transaction nhận được
+batch_size = 500 # Kích thước batch xử lý
 
-for message in consumer:
-    received_data = message.value
-    batch.extend(received_data)
-    
-    if len(batch) >= batch_size:
-        print("-" * 80)
-        for i in range(batch_size):
-            transaction = batch[i]      
-            print(f'{transaction['trans_date_trans_time']} |
-                    {transaction['cc_num']} |
-                    {transaction['merchant']} |
-                    {transaction['amt']} |
-                    {transaction['gender']} |
-                    {transaction['age']} |
-                    {transaction['lat']} |
-                    {transaction['long']} |
-                    {transaction['city_pop']} |
-                    {transaction['job']} |
-                    {transaction['unix_time']} |
-                    {transaction['merch_lat']} |
-                    {transaction['merch_long']} |
-                    {transaction['is_fraud']}')    
+try:
+    # Vòng lặp nhận message từ Kafka
+    for message in consumer:
+        try:
+            # Mỗi message nhận được từ producer có thể là list hoặc dict
+            received_data = message.value
+            if isinstance(received_data, list):
+                batch.extend(received_data)
+            else:
+                batch.append(received_data)
             
-        print("-" * 80)
-        logging.info(f'Processed batch: {batch[:batch_size]}')
-        batch = batch[batch_size:]
-        time.sleep(2)
+            # Khi đủ batch, tiến hành xử lý từng transaction
+            if len(batch) >= batch_size:
+                print("-" * 80)
+                for i in range(batch_size):
+                    transaction = batch[i]
+                    output = (
+                        f"{transaction.get('trans_date_trans_time', 'N/A')} | "
+                        f"{transaction.get('cc_num', 'N/A')} | "
+                        f"{transaction.get('merchant', 'N/A')} | "
+                        f"{transaction.get('amt', 'N/A')} | "
+                        f"{transaction.get('gender', 'N/A')} | "
+                        f"{transaction.get('age', 'N/A')} | "
+                        f"{transaction.get('lat', 'N/A')} | "
+                        f"{transaction.get('long', 'N/A')} | "
+                        f"{transaction.get('city_pop', 'N/A')} | "
+                        f"{transaction.get('job', 'N/A')} | "
+                        f"{transaction.get('unix_time', 'N/A')} | "
+                        f"{transaction.get('merch_lat', 'N/A')} | "
+                        f"{transaction.get('merch_long', 'N/A')} | "
+                        f"{transaction.get('is_fraud', 'N/A')}"
+                    )
+                    print(output)
+                    # Ghi log transaction dưới dạng CSV (các trường cách nhau bởi dấu phẩy)
+                    logging.info(
+                        f"{transaction.get('trans_date_trans_time', 'N/A')},"
+                        f"{transaction.get('cc_num', 'N/A')},"
+                        f"{transaction.get('merchant', 'N/A')},"
+                        f"{transaction.get('amt', 'N/A')},"
+                        f"{transaction.get('gender', 'N/A')},"
+                        f"{transaction.get('age', 'N/A')},"
+                        f"{transaction.get('lat', 'N/A')},"
+                        f"{transaction.get('long', 'N/A')},"
+                        f"{transaction.get('city_pop', 'N/A')},"
+                        f"{transaction.get('job', 'N/A')},"
+                        f"{transaction.get('unix_time', 'N/A')},"
+                        f"{transaction.get('merch_lat', 'N/A')},"
+                        f"{transaction.get('merch_long', 'N/A')},"
+                        f"{transaction.get('is_fraud', 'N/A')}"
+                    )
+                # Sau khi xử lý batch, reset danh sách để nhận dữ liệu mới
+                batch = []
+        except Exception as e:
+            print(f"[Error] Error processing message: {e}")
+except Exception as e:
+    print(f"[Error] Consumer error: {e}")
+finally:
+    consumer.close()
+    print("[Consumer] Consumer closed.")
