@@ -1,32 +1,23 @@
 import os
-import json
 from kafka import KafkaConsumer
+import json
 
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
-TOPIC_NAME = os.getenv("TOPIC_NAME", "fraud-transactions")
+BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS", "localhost:9092")
+TOPIC_NAME = os.getenv("TOPIC_NAME", "my_topic")
 
-def create_consumer():
-    return KafkaConsumer(
+def main():
+    consumer = KafkaConsumer(
         TOPIC_NAME,
-        bootstrap_servers=[KAFKA_BROKER],
+        bootstrap_servers=BOOTSTRAP_SERVERS,
+        value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         auto_offset_reset='earliest',
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        api_version=(2, 8, 1)
+        enable_auto_commit=True,
+        group_id='my-group'
     )
-
-def consume_transactions():
-    consumer = create_consumer()
-    print("Starting consumer...")
-    
+    print("Consumer started, waiting for messages...")
     for message in consumer:
-        transaction = message.value
-        print(f"""
-        Received transaction:
-        CC: {transaction['cc_num']}
-        Amount: ${transaction['amt']:.2f}
-        Merchant: {transaction['merchant']}
-        Fraud: {'⚠️' if transaction['is_fraud'] else '✅'}
-        """)
+        data = message.value
+        print(f"Received: {data}")
 
 if __name__ == "__main__":
-    consume_transactions()
+    main()

@@ -1,44 +1,33 @@
 import os
 import time
-import csv
-import json
+import pandas as pd
 from kafka import KafkaProducer
+import json
 
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
-TOPIC_NAME = os.getenv("TOPIC_NAME", "fraud-transactions")
+BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS", "localhost:9092")
+TOPIC_NAME = os.getenv("TOPIC_NAME", "my_topic")
 
-def create_producer():
-    return KafkaProducer(
-        bootstrap_servers=[KAFKA_BROKER],
-        value_serializer=lambda x: json.dumps(x).encode('utf-8'),
-        api_version=(2, 8, 1)
+def read_data_from_csv(file_path):
+    df = pd.read_csv(file_path)
+    return df
+
+def main():
+    producer = KafkaProducer(
+        bootstrap_servers=BOOTSTRAP_SERVERS,
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
 
-def simulate_transactions():
-    producer = create_producer()
+    data = read_data_from_csv('clean_train.csv')
     
-    with open(r'D:\Data Science\Big Data Technology\Project\Streaming-Fraud-Detection\Streaming-Fraud-Detection\data\raw\fraudTrain.csv', 'r') as file:
-        reader = csv.reader(file)
-        header = next(reader)
-        
-        for row in reader:
-            transaction = {
-                'trans_date_trans_time': row[0],
-                'cc_num': row[1],
-                'merchant': row[2],
-                'category': row[3],
-                'amt': float(row[4]),
-                'first': row[5],
-                'last': row[6],
-                'gender': row[7],
-                'city': row[9],
-                'state': row[10],
-                'is_fraud': int(row[-1])
-            }
-            
-            producer.send(TOPIC_NAME, value=transaction)
-            print(f"Sent transaction: {transaction['cc_num']}")
-            time.sleep(0.5)
+    # Giả sử ta sẽ gửi từng dòng lên Kafka, mô phỏng real-time
+    for idx, row in data.iterrows():
+        message = row.to_dict()  # Chuyển row thành dict
+        producer.send(TOPIC_NAME, value=message)
+        print(f"Sent: {message}")
+        time.sleep(1)  # Mô phỏng chờ 1s rồi gửi tiếp
+    
+    producer.flush()
+    producer.close()
 
 if __name__ == "__main__":
-    simulate_transactions()
+    main()

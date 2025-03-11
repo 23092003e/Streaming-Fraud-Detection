@@ -1,25 +1,50 @@
-version: '3'
-
+version: '3.8'
 services:
+  # Service Zookeeper
   zookeeper:
-    image: confluentinc/cp-zookeeper:lastest
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
 
+  # Service Kafka
   kafka:
-    image: confluentinc/cp-kafka:lastest
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
     depends_on:
       - zookeeper
+    ports:
+      - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "29092:29092"
-      - "9092:9092"
+
+  # Service Producer
+  producer:
+    build: .
+    container_name: kafka_producer
+    depends_on:
+      - kafka
+    # Truyền vào các biến môi trường cần thiết (nếu cần)
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      TOPIC_NAME: "my_topic"
+    # Khi container này chạy, nó sẽ thực thi lệnh python kafka_producer.py
+    command: python kafka_producer.py
+
+  # Service Consumer
+  consumer:
+    build: .
+    container_name: kafka_consumer
+    depends_on:
+      - kafka
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      TOPIC_NAME: "my_topic"
+    command: python kafka_consumer.py
