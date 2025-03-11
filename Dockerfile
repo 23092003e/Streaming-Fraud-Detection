@@ -1,2 +1,10 @@
-# Sử dụng image chính thức của Kafka từ Confluent
-FROM confluentinc/cp-kafka:latest
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+CMD ["python", "kafka_producer.py"]

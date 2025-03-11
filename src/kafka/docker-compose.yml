@@ -2,7 +2,7 @@ version: '3'
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
+    image: confluentinc/cp-zookeeper:lastest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -10,7 +10,7 @@ services:
       - "2181:2181"
 
   kafka:
-    image: confluentinc/cp-kafka:7.0.1
+    image: confluentinc/cp-kafka:lastest
     depends_on:
       - zookeeper
     environment:
@@ -23,23 +23,3 @@ services:
     ports:
       - "29092:29092"
       - "9092:9092"
-
-  producer:
-    build: .
-    command: python kafka_producer.py
-    depends_on:
-      - kafka
-    environment:
-      KAFKA_BROKER: "kafka:9092"
-      TOPIC_NAME: "fraud-transactions"
-    volumes:
-      - .:/app
-
-  consumer:
-    build: .
-    command: python kafka_consumer.py
-    depends_on:
-      - kafka
-    environment:
-      KAFKA_BROKER: "kafka:9092"
-      TOPIC_NAME: "fraud-transactions"

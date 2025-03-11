@@ -1,49 +1,44 @@
-from kafka import KafkaProducer
-import json
-import csv
+import os
 import time
-from datetime import datetime  # Sử dụng datetime từ module datetime
+import csv
+import json
+from kafka import KafkaProducer
 
-# Khởi tạo Kafka Producer với các thiết lập:
-# - bootstrap_servers: Địa chỉ Kafka broker (ở đây sử dụng port đã cấu hình cho kết nối từ host)
-# - value_serializer: Hàm chuyển đổi dữ liệu thành JSON và encode sang UTF-8
-# - acks='all': Đảm bảo Kafka nhận được tất cả các bản ghi từ producer
-producer = KafkaProducer(
-    bootstrap_servers='localhost:29092',
-    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-    acks='all'
-)
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
+TOPIC_NAME = os.getenv("TOPIC_NAME", "fraud-transactions")
 
-# Đường dẫn đến file CSV chứa dữ liệu (hãy đảm bảo đường dẫn đúng với hệ thống của bạn)
-data_path = r"D:\Data Science\Big Data Technology\Project\Streaming-Fraud-Detection\Streaming-Fraud-Detection\data\processed\clean_train.csv"
+def create_producer():
+    return KafkaProducer(
+        bootstrap_servers=[KAFKA_BROKER],
+        value_serializer=lambda x: json.dumps(x).encode('utf-8'),
+        api_version=(2, 8, 1)
+    )
 
-batch = []       # Danh sách chứa các dòng dữ liệu của một batch
-batch_size = 500 # Kích thước batch (số dòng dữ liệu gửi cùng 1 lần)
-
-try:
-    # Mở file CSV để đọc dữ liệu
-    with open(data_path, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
+def simulate_transactions():
+    producer = create_producer()
+    
+    with open(r'D:\Data Science\Big Data Technology\Project\Streaming-Fraud-Detection\Streaming-Fraud-Detection\data\raw\fraudTrain.csv', 'r') as file:
+        reader = csv.reader(file)
+        header = next(reader)
+        
         for row in reader:
-            # Thêm timestamp gửi dựa trên thời gian thực
-            row["send_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            batch.append(row)
+            transaction = {
+                'trans_date_trans_time': row[0],
+                'cc_num': row[1],
+                'merchant': row[2],
+                'category': row[3],
+                'amt': float(row[4]),
+                'first': row[5],
+                'last': row[6],
+                'gender': row[7],
+                'city': row[9],
+                'state': row[10],
+                'is_fraud': int(row[-1])
+            }
+            
+            producer.send(TOPIC_NAME, value=transaction)
+            print(f"Sent transaction: {transaction['cc_num']}")
+            time.sleep(0.5)
 
-            # Khi batch đủ kích thước, gửi toàn bộ batch đến Kafka topic 'fraud-detection'
-            if len(batch) >= batch_size:
-                producer.send('fraud-detection', value=batch)
-                print(f"[Producer] Sent batch of {batch_size} messages")
-                batch = []  # Reset batch sau khi gửi
-                time.sleep(2)  # Chờ 2 giây để tránh gửi quá nhanh
-
-    # Nếu có dữ liệu dư trong batch (không đủ 500 dòng), gửi chúng đi
-    if batch:
-        producer.send('fraud-detection', value=batch)
-        print(f"[Producer] Sent final batch of {len(batch)} messages")
-
-except Exception as e:
-    print(f"[ERROR] Failed to send message: {e}")
-finally:
-    # Đảm bảo rằng tất cả các message đã được gửi đi trước khi đóng producer
-    producer.flush()
-    producer.close()
+if __name__ == "__main__":
+    simulate_transactions()
