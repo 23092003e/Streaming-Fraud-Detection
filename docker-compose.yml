@@ -1,8 +1,7 @@
-version: '3'
-
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
+    image: confluentinc/cp-zookeeper:7.3.1
+    container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -10,36 +9,38 @@ services:
       - "2181:2181"
 
   kafka:
-    image: confluentinc/cp-kafka:7.0.1
+    image: confluentinc/cp-kafka:7.3.1
+    container_name: kafka
     depends_on:
       - zookeeper
     environment:
-      KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Đổi 'kafka' thành hostname broker tuỳ ý, 
+      # miễn là trùng với 'container_name' để các service khác truy cập được
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-      - "29092:29092"
       - "9092:9092"
 
-  producer:
-    build: .
-    command: python kafka_producer.py
+  # Ví dụ Kafka Producer
+  kafka-producer:
+    build:
+      context: ./src/kafka
+      dockerfile: Dockerfile
+    container_name: kafka-producer
     depends_on:
       - kafka
     environment:
-      KAFKA_BROKER: "kafka:9092"
-      TOPIC_NAME: "fraud-transactions"
-    volumes:
-      - .:/app
+      - KAFKA_BROKER=kafka:9092  # Sử dụng hostname 'kafka' (tên container) + port 9092
 
-  consumer:
-    build: .
-    command: python kafka_consumer.py
+  # Ví dụ Kafka Consumer
+  kafka-consumer:
+    build:
+      context: ./src/kafka
+      dockerfile: Dockerfile
+    container_name: kafka-consumer
     depends_on:
       - kafka
+    command: python kafka_consumer.py
     environment:
-      KAFKA_BROKER: "kafka:9092"
-      TOPIC_NAME: "fraud-transactions"
+      - KAFKA_BROKER=kafka:9092
