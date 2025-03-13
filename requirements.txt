@@ -1,5 +1,7 @@
 # requirements.txt
-kafka-python==2.0.2
+kafka-python
 pandas==1.3.5
-
-
+matplotlib==3.9.4
+scikit-learn==1.6.1
+numpy==2.0.2
+pandas==2.2.3
