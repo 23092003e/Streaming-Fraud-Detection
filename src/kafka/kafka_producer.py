@@ -9,8 +9,8 @@ class DataGenerator:
     index = 0
     def __init__(self):
         # read from csv
-        test_data_path = r'./data/raw/fraudTest.csv'
-        self.df = pd.read_csv(test_data_path, index_col=0)
+        test_path = r'D:\Data Science\Big Data Technology\Project\Streaming-Fraud-Detection\Streaming-Fraud-Detection\data\raw\fraudTest.csv'
+        self.df = pd.read_csv(test_path, index_col=0)
         print(self.df.columns)
         
     def generateTransactions(self):
@@ -19,35 +19,52 @@ class DataGenerator:
         messages = self.df[self.index: self.index + num].to_dict(orient='records')
         self.index += num
         return messages
-    
+
+
 class MyProducer:
     topic_name = 'transaction_data'
     
     def __init__(self):
         self.producer = KafkaProducer(
-            boostrap_servers = ['localhost:9092'],
-            client_id = 'my-producer',
-            acks = 1,
-            retries = 5,
-            key_serializer = lambda x: json.dumps(x).encode('utf-8'),
-            value_serializer = lambda y: json.dumps(y).encode('utf-8')
+            bootstrap_servers=['localhost:9092'],
+            client_id="test-producer",
+            acks=1,
+            retries=5, 
+            key_serializer=lambda a:json.dumps(a).encode('utf-8'),
+            value_serializer=lambda b:json.dumps(b).encode('utf-8')
         )
-    
     def produce_message(self, message):
-        # send the message to the topic
-        self.producer.send(self.topic_name, key=message['transactionId'], value=message)
-        print(f"Produced message: {message}")
-        
-    def send_data(self, message, multi = True):
+        self.producer.send(self.topic_name, message)
+
+    def send_data(self, messages, multi=True):
+        # Use threading for concurrent message production
         if multi:
             threads = []
-            for msg in message:
-                thread = threading.Thread(target=self.produce_message, args=(msg,))
+            for message in messages:
+                thread = threading.Thread(target=self.produce_message, args=(message,))
                 threads.append(thread)
                 thread.start()
+
+            # Wait for all threads to finish
             for thread in threads:
                 thread.join()
-                
-        else:   
-            future = self.producer.send(self.topic_name, key=message['transactionId'], value=message)
-            
+
+        else:
+            future=self.producer.send(self.topic_name, value=message, key=message['txn_id'])
+            self.producer.flush()
+
+    def __del__(self):
+        self.producer.close()
+
+print("Starting app...")
+dataGenerator=DataGenerator()
+MyProducer=MyProducer()
+
+try:
+    while True:
+        temp_data=dataGenerator.generateTransactions()
+        MyProducer.send_data(temp_data)
+        print(f'Sent {len(temp_data)} messages...')
+        time.sleep(3)
+except KeyboardInterrupt:
+    exit()

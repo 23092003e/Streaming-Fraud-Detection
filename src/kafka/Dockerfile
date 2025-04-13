@@ -1,9 +1,11 @@
-FROM python:3.9-slim
+FROM python:3.9
 
 WORKDIR /app
 
-COPY kafka.py .
+COPY ./requirements.txt .
 
-RUN pip install kafka-python
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "kafka.py"]
+COPY ./kafka_producer.py .
+
+CMD ["python", "kafka_producer.py"]
