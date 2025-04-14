@@ -7,7 +7,7 @@ schema = StructType([
     StructField("cc_num", StringType()),
     StructField("merchant", StringType()),
     StructField("category", StringType()),
-    StructField("amt", DoubleType()),
+    StructField("amt", DoubleType()),   
     StructField("first", StringType()),
     StructField("last", StringType()),
     StructField("gender", StringType()),
@@ -34,7 +34,7 @@ spark = SparkSession.builder \
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "fraud-topic") \
+    .option("subscribe", "transaction_data") \
     .load()
 
 json_df = df.selectExpr("CAST(value AS STRING)") \

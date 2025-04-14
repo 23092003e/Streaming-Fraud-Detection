@@ -32,3 +32,12 @@ services:
     depends_on:
       - kafka
     restart: unless-stopped
+
+
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: ./src/spark/Dockerfile
+    depends_on:
+      - kafka
+    restart: unless-stopped
