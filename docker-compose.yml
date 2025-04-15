@@ -32,12 +32,52 @@ services:
     depends_on:
       - kafka
     restart: unless-stopped
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"  # Spark Master API
+      - "8080:8080"  # Spark Master UI
+    networks:
+      - spark-net
 
-
-  spark-streaming:
-    build:
-      context: .
-      dockerfile: ./src/spark/Dockerfile
+  spark-worker-1:
+    image: bitnami/spark:latest
+    container_name: spark-worker-1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
-      - kafka
-    restart: unless-stopped
+      - spark-master
+    networks:
+      - spark-net
+
+  spark-worker-2:
+    image: bitnami/spark:latest
+    container_name: spark-worker-2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - spark-net
+
+  spark-notebook:
+    image: jupyter/pyspark-notebook
+    container_name: spark-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/home/jovyan/work  # Mount toàn bộ project folder
+    environment:
+      - PYSPARK_PYTHON=python3
+    depends_on:
+      - spark-master
+    networks:
+      - spark-net
+
+networks:
+  spark-net:

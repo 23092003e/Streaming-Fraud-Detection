@@ -1,4 +1,10 @@
-FROM apache/spark:3.1.2
+# src/spark/Dockerfile
+FROM jupyter/pyspark-notebook
 
-COPY ./src/spark/spark_streaming.py /app/spark_streaming.py
-
+USER root
+RUN pip install --no-cache-dir \
+    pandas \
+    scikit-learn \
+    matplotlib \
+    seaborn
+USER $NB_UID
