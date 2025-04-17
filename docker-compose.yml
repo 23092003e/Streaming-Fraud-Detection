@@ -66,18 +66,18 @@ services:
       - spark-net
 
   spark-notebook:
-    image: jupyter/pyspark-notebook
+    build:
+      context: .
+      dockerfile: ./src/spark/Dockerfile
     container_name: spark-notebook
     ports:
       - "8888:8888"
     volumes:
-      - .:/home/jovyan/work  # Mount toàn bộ project folder
+      - .:/home/jovyan/work
     environment:
       - PYSPARK_PYTHON=python3
+      - SPARK_MASTER=spark://spark-master:7077
     depends_on:
       - spark-master
     networks:
       - spark-net
-
-networks:
-  spark-net:
