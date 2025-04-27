@@ -4,7 +4,7 @@ from pyspark.sql.types import *
 
 schema = StructType([
     StructField("trans_date_trans_time", StringType()),
-    StructField("cc_num", StringType()),
+    StructField("cc_num", LongType()),
     StructField("merchant", StringType()),
     StructField("category", StringType()),
     StructField("amt", DoubleType()),   
@@ -29,12 +29,14 @@ schema = StructType([
 
 spark = SparkSession.builder \
     .appName("KafkaSparkStreaming") \
+    .config("spark.streaming.stopGracefullyOnShutdown", "true") \
     .getOrCreate()
 
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "transaction_data") \
+    .option("startingOffsets", "earliest") \
     .load()
 
 json_df = df.selectExpr("CAST(value AS STRING)") \

@@ -1,17 +1,19 @@
-version: '3.8'
-
 services:
   zookeeper:
     image: wurstmeister/zookeeper
+    container_name: zookeeper
     ports:
       - "2181:2181"
     restart: unless-stopped
+    networks:
+      - spark-net
 
   kafka:
     image: wurstmeister/kafka
+    container_name: kafka
     ports:
       - "9092:9092"
-      - "29092:29092" 
+      - "29092:29092"
     environment:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
@@ -22,16 +24,22 @@ services:
     depends_on:
       - zookeeper
     restart: unless-stopped
+    networks:
+      - spark-net
 
   kafka-client:
     build:
       context: .
-      dockerfile: ./src/kafka/DockerFile
+      dockerfile: ./src/kafka/Dockerfile
+    container_name: kafka-client
     environment:
       KAFKA_BROKER: "kafka:9092"
     depends_on:
       - kafka
     restart: unless-stopped
+    networks:
+      - spark-net
+
   spark-master:
     image: bitnami/spark:latest
     container_name: spark-master
@@ -40,6 +48,8 @@ services:
     ports:
       - "7077:7077"  # Spark Master API
       - "8080:8080"  # Spark Master UI
+    volumes:
+      - .:/opt/spark/work-dir  # Mount project folder
     networks:
       - spark-net
 
@@ -65,19 +75,17 @@ services:
     networks:
       - spark-net
 
-  spark-notebook:
-    image: jupyter/pyspark-notebook
-    container_name: spark-notebook
-    ports:
-      - "8888:8888"
-    volumes:
-      - .:/home/jovyan/work  # Mount toàn bộ project folder
-    environment:
-      - PYSPARK_PYTHON=python3
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: ./src/spark/Dockerfile
+    container_name: spark-streaming
     depends_on:
+      - kafka
       - spark-master
     networks:
       - spark-net
 
 networks:
   spark-net:
+    driver: bridge
