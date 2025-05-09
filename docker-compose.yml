@@ -45,6 +45,7 @@ services:
     container_name: spark-master
     environment:
       - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
     ports:
       - "7077:7077"  # Spark Master API
       - "8080:8080"  # Spark Master UI
@@ -61,6 +62,9 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
+    volumes:
+      - ./src/model:/src/model
+      - ./data:/data
     networks:
       - spark-net
 
@@ -72,6 +76,9 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
+    volumes:
+      - ./src/model:/src/model
+      - ./data:/data
     networks:
       - spark-net
 
@@ -83,6 +90,9 @@ services:
     depends_on:
       - kafka
       - spark-master
+    volumes:
+      - ./src/model:/src/model
+      - ./data:/data
     networks:
       - spark-net
 
