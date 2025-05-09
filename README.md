@@ -4,7 +4,7 @@
 A real-time fraud detection system built using modern technologies such as Apache Kafka, PySpark, Cassandra, and Docker. The system includes a live dashboard created with PowerBI for reporting and analytics.
 
 ## System Architecture
-![System Architecture](images/architecture.png)
+![System Architecture](images/workflow.png)
 
 ### Core Components
 - **Apache Kafka**: Real-time data stream processing
