@@ -1,9 +1,60 @@
 from cassandra.cluster import Cluster
+from cassandra.policies import RetryPolicy, RoundRobinPolicy
+from cassandra.pool import HostDistance
 import time
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+class CassandraConnection:
+    def __init__(self, hosts=['cassandra'], port=9042):
+        self.hosts = hosts
+        self.port = port
+        self.cluster = None
+        self.session = None
+        self.connect()
+
+    def connect(self):
+        """Connect to Cassandra with enhanced configuration."""
+        retry_policy = RetryPolicy()
+        
+        # Enhanced cluster configuration
+        self.cluster = Cluster(
+            self.hosts,
+            port=self.port,
+            load_balancing_policy=RoundRobinPolicy(),
+            retry_policy=retry_policy,
+            protocol_version=4,
+            connect_timeout=10
+        )
+        
+        # Configure connection pools
+        self.cluster.connection_class.max_requests_per_connection = 32768
+        self.cluster.connection_class.min_requests_per_connection = 100
+        
+        # Set pool settings
+        self.cluster.set_connection_class_distance(HostDistance.LOCAL, 2, 100)
+        self.cluster.set_connection_class_distance(HostDistance.REMOTE, 1, 10)
+
+        self.session = self.cluster.connect()
+        
+    def ensure_connection(self):
+        """Ensure connection is alive and reconnect if needed."""
+        try:
+            self.session.execute("SELECT release_version FROM system.local")
+        except Exception as e:
+            logging.error(f"Connection error: {e}")
+            logging.info("Attempting to reconnect...")
+            self.connect()
+        return self.session
+
+    def close(self):
+        """Close connections properly."""
+        if self.session:
+            self.session.shutdown()
+        if self.cluster:
+            self.cluster.shutdown()
 
 def connect_to_cassandra(host=['cassandra'], max_retries=20, retry_interval=5):
     """Connect to Cassandra with retry logic."""
@@ -54,29 +105,50 @@ def setup_database(session):
     session.execute(table_query)
     logging.info("Table 'predictions' created or already exists.")
 
-def insert_predictions(session, predictions_df):
-    """Insert prediction values from a Spark DataFrame into the database."""
+def insert_predictions_batch(cassandra_conn, predictions_df, batch_size=1000):
+    """Insert predictions in batches with connection check."""
     insert_query = """
     INSERT INTO fraud_detection.predictions (
-        trans_date_trans_time, cc_num, amt, merchant, category, is_fraud, prediction, probability
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        trans_date_trans_time, cc_num, amt, merchant, category, 
+        is_fraud, prediction, probability
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """
-    # Collect DataFrame rows to process them
+    
+    session = cassandra_conn.ensure_connection()
+    
+    # Prepare the statement for better performance
+    prepared_stmt = session.prepare(insert_query)
+    
+    # Process in batches
     rows = predictions_df.collect()
-    count = 0
-    for row in rows:
-        session.execute(insert_query, (
-            row.trans_date_trans_time,
-            row.cc_num,
-            row.amt,
-            row.merchant,
-            row.category,
-            row.is_fraud,
-            row.prediction,
-            row.probability
-        ))
-        count += 1
-    logging.info(f"Inserted {count} predictions")
+    total_count = 0
+    batch_count = 0
+    
+    try:
+        for i in range(0, len(rows), batch_size):
+            batch = rows[i:i + batch_size]
+            for row in batch:
+                session.execute(prepared_stmt, (
+                    row.trans_date_trans_time,
+                    row.cc_num,
+                    row.amt,
+                    row.merchant,
+                    row.category,
+                    row.is_fraud,
+                    row.prediction,
+                    row.probability
+                ))
+            batch_count += 1
+            total_count += len(batch)
+            logging.info(f"Inserted batch {batch_count} ({total_count} records total)")
+            
+    except Exception as e:
+        logging.error(f"Error inserting batch: {e}")
+        # Ensure connection is still alive
+        session = cassandra_conn.ensure_connection()
+        raise
+        
+    return total_count
 
 def verify_data(session, limit=10):
     """Retrieve and display data from the database."""
