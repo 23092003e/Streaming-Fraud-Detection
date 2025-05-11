@@ -24,19 +24,13 @@ def extract_time_features(df):
              .withColumn("dob", to_timestamp("dob")) \
              .withColumn("age", (year("trans_date") - year("dob")))
 
-def compute_amt_vs_category_avg(df, spark):
+def compute_amt_vs_category_avg(df, static_avg):
     """Calculate amount relative to average amount by category using a static lookup."""
-    # Load fraudTest.csv to compute static category averages
-    static_df = spark.read.csv("/data/raw/fraudTest.csv", header=True, inferSchema=True)
-    static_avg = static_df.groupBy("category").agg(F.avg("amt").alias("avg_amt"))
-
-    # Join streaming DataFrame with static averages
     result_df = df.join(
         static_avg,
         df.category == static_avg.category,
         "left_outer"
     ) \
     .withColumn("amt_vs_category_avg", col("amt") / F.coalesce(col("avg_amt"), F.lit(70.0))) \
-    .drop(static_avg.category, "avg_amt")  # Drop duplicate category and avg_amt
-
+    .drop(static_avg.category, "avg_amt")
     return result_df

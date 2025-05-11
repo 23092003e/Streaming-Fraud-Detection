@@ -2,3 +2,4 @@
 pyspark==3.5.0
 geopy==1.23.0
 numpy==1.26.4
+cassandra-driver==3.28.0

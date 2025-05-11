@@ -13,11 +13,10 @@ services:
     container_name: kafka
     ports:
       - "9092:9092"
-      - "29092:29092"
     environment:
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -41,7 +40,7 @@ services:
       - spark-net
 
   spark-master:
-    image: bitnami/spark:latest
+    image: bitnami/spark:3.5.0
     container_name: spark-master
     environment:
       - SPARK_MODE=master
@@ -51,11 +50,12 @@ services:
       - "8080:8080"  # Spark Master UI
     volumes:
       - .:/opt/spark/work-dir  # Mount project folder
+      - ./data:/data
     networks:
       - spark-net
 
   spark-worker-1:
-    image: bitnami/spark:latest
+    image: bitnami/spark:3.5.0
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
@@ -65,11 +65,15 @@ services:
     volumes:
       - ./src/model:/src/model
       - ./data:/data
+      - ./src/spark/requirements.txt:/requirements.txt  # Mount requirements.txt
+    command: >
+      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+               /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
     networks:
       - spark-net
 
   spark-worker-2:
-    image: bitnami/spark:latest
+    image: bitnami/spark:3.5.0
     container_name: spark-worker-2
     environment:
       - SPARK_MODE=worker
@@ -79,6 +83,10 @@ services:
     volumes:
       - ./src/model:/src/model
       - ./data:/data
+      - ./src/spark/requirements.txt:/requirements.txt  # Mount requirements.txt
+    command: >
+      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+               /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
     networks:
       - spark-net
 
@@ -88,13 +96,39 @@ services:
       dockerfile: ./src/spark/Dockerfile
     container_name: spark-streaming
     depends_on:
-      - kafka
-      - spark-master
+      cassandra:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      spark-master:
+        condition: service_started
     volumes:
       - ./src/model:/src/model
       - ./data:/data
     networks:
       - spark-net
+
+  cassandra:
+    image: cassandra:latest
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=spark_cassandra_cluster
+    volumes:
+      - cassandra-data:/var/lib/cassandra 
+    restart: unless-stopped
+    networks:
+      - spark-net
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s  
+
+volumes:
+  cassandra-data:
 
 networks:
   spark-net:
