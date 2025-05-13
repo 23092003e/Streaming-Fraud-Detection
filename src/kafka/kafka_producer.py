@@ -13,7 +13,7 @@ class DataGenerator:
         print(self.df.columns)
         
     def generateTransactions(self):
-        num = random.randint(1, 10)
+        num = random.randint(1, 5)
         # num = 1
         messages = self.df[self.index: self.index + num].to_dict(orient='records')
         self.index += num
@@ -64,6 +64,6 @@ try:
         temp_data=dataGenerator.generateTransactions()
         MyProducer.send_data(temp_data)
         print(f'Sent {len(temp_data)} messages...')
-        time.sleep(3)
+        time.sleep(30)
 except KeyboardInterrupt:
     exit()

@@ -11,12 +11,6 @@ import logging
 from pyspark.sql.functions import udf
 from pyspark.sql.types import ArrayType, DoubleType
 from pyspark.sql import functions as F
-from cassandra_init import (
-    connect_to_cassandra,
-    setup_database,
-    verify_data
-)
-import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -47,17 +41,10 @@ schema = StructType([
 ])
 
 spark = SparkSession.builder \
-    .appName("KafkaSparkStreaming") \
-    .config("spark.streaming.stopGracefullyOnShutdown", "true") \
-    .config("spark.cassandra.connection.host", "cassandra") \
-    .config("spark.cassandra.connection.port", "9042") \
-    .config("spark.cassandra.connection.timeoutMS", "30000") \
-    .config("spark.cassandra.connection.reconnectionDelayMS.max", "10000") \
-    .config("spark.cassandra.connection.retry.count", "10") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.datastax.spark:spark-cassandra-connector_2.12:3.5.0") \
-    .config("spark.task.maxFailures", "8") \
-    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-    .getOrCreate()
+        .appName("FraudDetectionStreamProcessor") \
+        .config("spark.streaming.backpressure.enabled", "true") \
+        .config("spark.streaming.kafka.maxRatePerPartition", "100") \
+        .getOrCreate()
 logging.info("Spark session initialized.")
 
 df = spark.readStream \
@@ -95,6 +82,7 @@ logging.info("Predictions generated.")
 def vector_to_list(vector):
     return vector.toArray().tolist()
 vector_to_list_udf = udf(vector_to_list, ArrayType(DoubleType()))
+
 output_df = predictions.select(
     "trans_date_trans_time",
     "cc_num",
@@ -103,38 +91,11 @@ output_df = predictions.select(
     "category",
     "is_fraud",
     "prediction",
-    vector_to_list_udf("probability").alias("probability")
+    vector_to_list_udf("probability").alias("probability"),
 )
 
-console_query = output_df.writeStream \
-    .format("console") \
+query = output_df.writeStream \
     .outputMode("append") \
-    .option("truncate", "false") \
+    .format("console") \
     .start()
-logging.info("Console streaming query started.")
-
-# Connect to Cassandra and set up schema
-cluster, session = connect_to_cassandra()
-try:
-    setup_database(session)
-    logging.info("Cassandra schema setup completed.")
-
-    # Write predictions to Cassandra
-    query = output_df.writeStream \
-        .format("org.apache.spark.sql.cassandra") \
-        .option("keyspace", "fraud_detection") \
-        .option("table", "predictions") \
-        .option("checkpointLocation", "/data/checkpoints") \
-        .outputMode("append") \
-        .start()
-    logging.info("Cassandra streaming query started.")
-
-    # Verify data periodically
-    verify_data(session)
-except Exception as e:
-    logging.error(f"An error occurred: {e}\n{traceback.format_exc()}")
-    raise
-
-# Await termination
-spark.streams.awaitAnyTermination()
-logging.info("Streaming application terminated.")
+query.awaitTermination()
