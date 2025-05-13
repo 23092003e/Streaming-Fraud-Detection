@@ -46,10 +46,10 @@ services:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master
     ports:
-      - "7077:7077"  # Spark Master API
-      - "8080:8080"  # Spark Master UI
+      - "7077:7077"
+      - "8080:8080"
     volumes:
-      - .:/opt/spark/work-dir  # Mount project folder
+      - .:/opt/spark/work-dir
       - ./data:/data
     networks:
       - spark-net
@@ -65,7 +65,7 @@ services:
     volumes:
       - ./src/model:/src/model
       - ./data:/data
-      - ./src/spark/requirements.txt:/requirements.txt  # Mount requirements.txt
+      - ./src/spark/requirements.txt:/requirements.txt
     command: >
       bash -c "pip install --no-cache-dir -r /requirements.txt &&
                /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
@@ -83,7 +83,7 @@ services:
     volumes:
       - ./src/model:/src/model
       - ./data:/data
-      - ./src/spark/requirements.txt:/requirements.txt  # Mount requirements.txt
+      - ./src/spark/requirements.txt:/requirements.txt
     command: >
       bash -c "pip install --no-cache-dir -r /requirements.txt &&
                /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
@@ -96,8 +96,6 @@ services:
       dockerfile: ./src/spark/Dockerfile
     container_name: spark-streaming
     depends_on:
-      cassandra:
-        condition: service_healthy
       kafka:
         condition: service_started
       spark-master:
@@ -107,28 +105,6 @@ services:
       - ./data:/data
     networks:
       - spark-net
-
-  cassandra:
-    image: cassandra:latest
-    container_name: cassandra
-    ports:
-      - "9042:9042"
-    environment:
-      - CASSANDRA_CLUSTER_NAME=spark_cassandra_cluster
-    volumes:
-      - cassandra-data:/var/lib/cassandra 
-    restart: unless-stopped
-    networks:
-      - spark-net
-    healthcheck:
-      test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s  
-
-volumes:
-  cassandra-data:
 
 networks:
   spark-net:
