@@ -1,7 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json
+from pyspark.sql.functions import col, from_json, current_timestamp
 from pyspark.sql.types import *
 from pyspark.ml import PipelineModel
+from pyspark.sql import functions as F
 from spark_utils import (
     calculate_distance,
     extract_time_features,
@@ -10,7 +11,7 @@ from spark_utils import (
 import logging
 from pyspark.sql.functions import udf
 from pyspark.sql.types import ArrayType, DoubleType
-from pyspark.sql import functions as F
+from pyspark.ml.functions import vector_to_array
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -42,8 +43,10 @@ schema = StructType([
 
 spark = SparkSession.builder \
         .appName("FraudDetectionStreamProcessor") \
-        .config("spark.streaming.backpressure.enabled", "true") \
-        .config("spark.streaming.kafka.maxRatePerPartition", "100") \
+        .config("spark.streaming.stopGracefullyonShutdown", True)\
+        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0")\
+        .config("spark.sql.shuffle.partitions", 4)\
+        .master("local[*]")\
         .getOrCreate()
 logging.info("Spark session initialized.")
 
@@ -78,24 +81,65 @@ logging.info(f"Model loaded from {model_path}.")
 predictions = model.transform(json_df)
 logging.info("Predictions generated.")
 
-# Extract probability as a list and select relevant columns
-def vector_to_list(vector):
-    return vector.toArray().tolist()
-vector_to_list_udf = udf(vector_to_list, ArrayType(DoubleType()))
+# # Extract probability as a list and select relevant columns
+# def vector_to_list(vector):
+#     if vector:
+#         return vector.toArray().tolist()
+#     return None
+
+# vector_to_list_udf = udf(vector_to_list, ArrayType(DoubleType()))
 
 output_df = predictions.select(
-    "trans_date_trans_time",
-    "cc_num",
-    "amt",
-    "merchant",
-    "category",
-    "is_fraud",
-    "prediction",
-    vector_to_list_udf("probability").alias("probability"),
+    col("trans_date_trans_time"),
+    col("cc_num"),
+    col("amt"),
+    col("merchant"),
+    col("category"),
+    col("is_fraud"),
+    col("prediction"),
+    vector_to_array(col("probability")).getItem(0).alias("prob_0"),
+    vector_to_array(col("probability")).getItem(1).alias("prob_1")
 )
+logging.info("Schema of Prediction output:")
+logging.info(output_df.schema)
 
+# Define JDBC connection properties
+port = 5432
+host = "postgres"
+# table = "employees"
+password = "password"
+username = "postgres"
+database = "streaming"
+
+jdbc_url = f"jdbc:postgresql://{host}:{port}/{database}"
+connection_properties = {
+    "user": username,
+    "password": password,
+    "driver": "org.postgresql.Driver"
+}
+
+def process_batches(df, epoch_id):
+    try:
+        logging.info(f"Processing batch {epoch_id} with {df.count()} records")
+        df.write \
+            .format("jdbc") \
+            .mode("append") \
+            .option("url", jdbc_url) \
+            .option("dbtable", "fraud_predictions") \
+            .option("user", username) \
+            .option("password", password) \
+            .option("driver", "org.postgresql.Driver") \
+            .save()
+        logging.info(f"Batch {epoch_id} successfully written to PostgreSQL")
+    except Exception as e:
+        logging.error(f"Error writing batch {epoch_id} to PostgreSQL: {str(e)}")
+    print("~~~~~~~~~~~~~~~~~~~~~~ data loaded ~~~~~~~~~~~~~~~~~~~~~~")
+        
+
+# Define a query to postgre table: employees
 query = output_df.writeStream \
-    .outputMode("append") \
-    .format("console") \
-    .start()
-query.awaitTermination()
+            .trigger(processingTime='10 seconds') \
+            .foreachBatch(process_batches) \
+            .outputMode("append") \
+            .start()\
+            .awaitTermination()
