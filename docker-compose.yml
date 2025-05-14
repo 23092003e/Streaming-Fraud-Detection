@@ -60,6 +60,8 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=3G
+      - SPARK_WORKER_CORES=2
     depends_on:
       - spark-master
     volumes:
@@ -67,7 +69,7 @@ services:
       - ./data:/data
       - ./src/spark/requirements.txt:/requirements.txt
     command: >
-      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+      bash -c "pip install --no-cache-dir -r /requirements.txt && \
                /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
     networks:
       - spark-net
@@ -78,6 +80,8 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=3G
+      - SPARK_WORKER_CORES=2
     depends_on:
       - spark-master
     volumes:
@@ -85,7 +89,7 @@ services:
       - ./data:/data
       - ./src/spark/requirements.txt:/requirements.txt
     command: >
-      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+      bash -c "pip install --no-cache-dir -r /requirements.txt && \
                /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077"
     networks:
       - spark-net
@@ -96,15 +100,36 @@ services:
       dockerfile: ./src/spark/Dockerfile
     container_name: spark-streaming
     depends_on:
-      kafka:
-        condition: service_started
-      spark-master:
-        condition: service_started
+      - kafka
+      - spark-master
     volumes:
       - ./src/model:/src/model
       - ./data:/data
+      - ./src/spark:/app
+    deploy:
+      resources:
+        limits:
+          memory: 6g
     networks:
       - spark-net
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: streaming
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./src/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - spark-net
+
+volumes:
+  postgres_data:
 
 networks:
   spark-net:

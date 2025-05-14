@@ -64,6 +64,6 @@ try:
         temp_data=dataGenerator.generateTransactions()
         MyProducer.send_data(temp_data)
         print(f'Sent {len(temp_data)} messages...')
-        time.sleep(30)
+        time.sleep(5)
 except KeyboardInterrupt:
     exit()
