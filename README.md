@@ -1,7 +1,7 @@
 # Streaming Fraud Detection System
 
 ## Introduction
-A real-time fraud detection system built using modern technologies such as Apache Kafka, PySpark, Cassandra, and Docker. The system includes a live dashboard created with PowerBI for reporting and analytics.
+A real-time fraud detection system built using modern technologies such as Apache Kafka, PySpark, PostgresQL, and Docker. The system includes a live dashboard created with Streamlit for reporting and analytics.
 
 ## System Architecture
 ![System Architecture](images/workflow.png)
@@ -9,9 +9,9 @@ A real-time fraud detection system built using modern technologies such as Apach
 ### Core Components
 - **Apache Kafka**: Real-time data stream processing
 - **PySpark**: Distributed data processing and ML model application
-- **Cassandra**: Data storage
+- **PostgresQL**: Data storage
 - **Docker**: Service containerization and orchestration
-- **PowerBI**: Data visualization and analytics
+- **Streamlit**: Data visualization and analytics
 
 ## System Requirements
 - Docker and Docker Compose
