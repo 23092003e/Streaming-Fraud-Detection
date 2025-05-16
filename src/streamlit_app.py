@@ -22,12 +22,21 @@ st.set_page_config(
 @st.cache_resource
 def get_postgres_connection():
     try:
+        # Print connection details for debugging
+        host = os.environ.get("POSTGRES_HOST", "postgres")
+        database = os.environ.get("POSTGRES_DB", "streaming")
+        user = os.environ.get("POSTGRES_USER", "postgres")
+        password = os.environ.get("POSTGRES_PASSWORD", "password")
+        port = os.environ.get("POSTGRES_PORT", "5432")
+        
+        st.write(f"Debug - Connecting to PostgreSQL: host={host}, db={database}, user={user}, port={port}")
+        
         conn = psycopg2.connect(
-            host=os.environ.get("POSTGRES_HOST", "postgres"),
-            database=os.environ.get("POSTGRES_DB", "streaming"),
-            user=os.environ.get("POSTGRES_USER", "postgres"),
-            password=os.environ.get("POSTGRES_PASSWORD", "password"),
-            port=os.environ.get("POSTGRES_PORT", "5432")
+            host=host,
+            database=database,
+            user=user,
+            password=password,
+            port=port
         )
         return conn
     except Exception as e:
@@ -237,7 +246,7 @@ fraud_filter = st.sidebar.checkbox("Show only fraudulent transactions")
 # Data refresh button
 if st.sidebar.button("Refresh Data"):
     st.cache_data.clear()
-    st.experimental_rerun()
+    st.rerun()
 
 # Display connection status
 try:
