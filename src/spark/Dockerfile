@@ -28,7 +28,7 @@ RUN curl -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.5.0.jar \
     curl -o /opt/bitnami/spark/jars/commons-pool2-2.12.0.jar \
     https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar
 
-# Cấu hình cho Spark
+# Spark Configuration
 ENV SPARK_MASTER_URL=spark://spark-master:7077 
 ENV SPARK_DRIVER_MEMORY=2g
 ENV SPARK_EXECUTOR_MEMORY=2g

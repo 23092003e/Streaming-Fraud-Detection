@@ -2,5 +2,6 @@
 pyspark==3.5.0
 geopy==1.23.0
 numpy==1.26.4
-pandas==2.2.0
+pandas==2.1.4
 jaydebeapi==1.2.3
+psycopg2-binary==2.9.9
