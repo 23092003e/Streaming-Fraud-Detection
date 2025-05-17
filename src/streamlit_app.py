@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import psycopg2
 import time
 import os
-from utils.utils import create_spark_session
 
 # Set page title and configuration
 st.set_page_config(
@@ -29,8 +28,6 @@ def get_postgres_connection():
         password = os.environ.get("POSTGRES_PASSWORD", "password")
         port = os.environ.get("POSTGRES_PORT", "5432")
         
-        st.write(f"Debug - Connecting to PostgreSQL: host={host}, db={database}, user={user}, port={port}")
-        
         conn = psycopg2.connect(
             host=host,
             database=database,
@@ -41,15 +38,6 @@ def get_postgres_connection():
         return conn
     except Exception as e:
         st.error(f"Cannot connect to PostgreSQL: {e}")
-        return None
-
-# Connect to Spark (if needed)
-@st.cache_resource
-def get_spark_session():
-    try:
-        return create_spark_session()
-    except Exception as e:
-        st.warning(f"Cannot connect to Spark: {e}")
         return None
 
 # Function to fetch data from PostgreSQL
@@ -66,29 +54,17 @@ def get_transactions(limit=1000, fraud_only=False, time_window=None):
     if fraud_only:
         conditions.append("is_fraud = 1")
     
-    if time_window:
-        conditions.append("trans_date_trans_time >= %s")
-        params.append((datetime.now() - timedelta(hours=time_window)).strftime('%Y-%m-%d %H:%M:%S'))
-    
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     
     query += f" ORDER BY trans_date_trans_time DESC LIMIT {limit}"
     
     try:
-        df = pd.read_sql_query(query, conn, params=params)
-        # Add transaction_id column if not present (using index)
-        if 'transaction_id' not in df.columns:
-            df['transaction_id'] = df.index
-        # Map cc_num to user_id if needed
-        if 'user_id' not in df.columns and 'cc_num' in df.columns:
-            df['user_id'] = df['cc_num']
-        # Map amount to amt if needed
-        if 'amount' not in df.columns and 'amt' in df.columns:
-            df['amount'] = df['amt']
-        # Map transaction_time to trans_date_trans_time
-        if 'transaction_time' not in df.columns and 'trans_date_trans_time' in df.columns:
-            df['transaction_time'] = pd.to_datetime(df['trans_date_trans_time'])
+        cursor = conn.cursor()
+        cursor.execute(query)
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
         st.error(f"Error fetching transactions: {e}")
@@ -256,11 +232,6 @@ try:
     else:
         st.sidebar.error("❌ PostgreSQL Connection Failed")
         
-    spark = get_spark_session()
-    if spark:
-        st.sidebar.success("✅ Spark Connected")
-    else:
-        st.sidebar.warning("⚠️ Spark Connection Failed")
 except Exception as e:
     st.sidebar.error(f"Connection error: {e}")
 
@@ -321,23 +292,12 @@ if page == "Overview":
                 lambda x: "⚠️ FRAUD" if x == 1 else "✅ VALID"
             )
         
-        # Format datetime and amount columns
-        if 'transaction_time' in display_df.columns:
-            display_df['Time'] = pd.to_datetime(display_df['transaction_time']).strftime('%Y-%m-%d %H:%M:%S')
-        elif 'trans_date_trans_time' in display_df.columns:
-            display_df['Time'] = pd.to_datetime(display_df['trans_date_trans_time']).strftime('%Y-%m-%d %H:%M:%S')
-        
-        if 'amount' in display_df.columns:
-            display_df['Amount'] = display_df['amount'].apply(lambda x: f"${x:,.2f}")
-        elif 'amt' in display_df.columns:
-            display_df['Amount'] = display_df['amt'].apply(lambda x: f"${x:,.2f}")
-        
         # Select and rename columns for display
         columns_to_display = {
             'transaction_id': 'Transaction ID',
-            'Time': 'Time',
-            'user_id': 'User ID',
-            'Amount': 'Amount',
+            'trans_date_trans_time': 'Time',
+            'cc_num': 'Credit Card Number',
+            'amt': 'Amount',
             'merchant': 'Merchant',
             'category': 'Category',
             'Status': 'Status'
@@ -379,7 +339,6 @@ elif page == "Transaction Analysis":
     
     # Search logic
     if search_button:
-        st.info("Searching transactions...")
         conn = get_postgres_connection()
         if not conn:
             st.error("Cannot connect to database")
@@ -422,15 +381,13 @@ elif page == "Transaction Analysis":
                     display_df['Status'] = display_df['is_fraud'].apply(
                         lambda x: "⚠️ FRAUD" if x == 1 else "✅ VALID"
                     )
-                    display_df['Time'] = pd.to_datetime(display_df['trans_date_trans_time']).strftime('%Y-%m-%d %H:%M:%S')
-                    display_df['Amount'] = display_df['amt'].apply(lambda x: f"${x:,.2f}")
                     
                     # Display columns
                     columns_to_display = {
-                        'transaction_id': 'ID',
-                        'Time': 'Time',
-                        'cc_num': 'Card Number',
-                        'Amount': 'Amount',
+                        'transaction_id': 'Transaction ID',
+                        'trans_date_trans_time': 'Time',
+                        'cc_num': 'Credit Card Number',
+                        'amt': 'Amount',
                         'merchant': 'Merchant',
                         'category': 'Category',
                         'Status': 'Status'
@@ -463,23 +420,12 @@ elif page == "Transaction Analysis":
                 lambda x: "⚠️ FRAUD" if x == 1 else "✅ VALID"
             )
         
-        # Format columns
-        if 'transaction_time' in display_df.columns:
-            display_df['Time'] = pd.to_datetime(display_df['transaction_time']).strftime('%Y-%m-%d %H:%M:%S')
-        elif 'trans_date_trans_time' in display_df.columns:
-            display_df['Time'] = pd.to_datetime(display_df['trans_date_trans_time']).strftime('%Y-%m-%d %H:%M:%S')
-        
-        if 'amount' in display_df.columns:
-            display_df['Amount'] = display_df['amount'].apply(lambda x: f"${x:,.2f}")
-        elif 'amt' in display_df.columns:
-            display_df['Amount'] = display_df['amt'].apply(lambda x: f"${x:,.2f}")
-        
-        # Select columns for display
+        # Select and rename columns for display
         columns_to_display = {
-            'transaction_id': 'ID',
-            'Time': 'Time',
-            'cc_num': 'Card Number',
-            'Amount': 'Amount',
+            'transaction_id': 'Transaction ID',
+            'trans_date_trans_time': 'Time',
+            'cc_num': 'Credit Card Number',
+            'amt': 'Amount',
             'merchant': 'Merchant',
             'category': 'Category',
             'Status': 'Status'

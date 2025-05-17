@@ -128,6 +128,21 @@ services:
     networks:
       - spark-net
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: streamlit
+    depends_on:
+      - postgres
+      - spark-streaming
+    ports:
+      - "8501:8501"
+    environment:
+      - POSTGRES_HOST=postgres
+    networks:
+      - spark-net
+
 volumes:
   postgres_data:
 
