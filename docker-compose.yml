@@ -32,7 +32,7 @@ services:
       dockerfile: ./src/kafka/Dockerfile
     container_name: kafka-client
     environment:
-      KAFKA_BROKER: "kafka:9092"
+      KAFKA_BROKER: "${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}"
     depends_on:
       - kafka
     restart: unless-stopped
@@ -59,9 +59,9 @@ services:
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=3G
-      - SPARK_WORKER_CORES=2
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-3G}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
     depends_on:
       - spark-master
     volumes:
@@ -79,9 +79,9 @@ services:
     container_name: spark-worker-2
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=3G
-      - SPARK_WORKER_CORES=2
+      - SPARK_MASTER_URL=${SPARK_MASTER_URL:-spark://spark-master:7077}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-3G}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
     depends_on:
       - spark-master
     volumes:
@@ -106,25 +106,38 @@ services:
       - ./src/model:/src/model
       - ./data:/data
       - ./src/spark:/app
-    deploy:
-      resources:
-        limits:
-          memory: 6g
+      - spark_checkpoints:/tmp/spark-checkpoints
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}"
+      KAFKA_TOPIC: "${KAFKA_TOPIC:-transaction_data}"
+      MODEL_PATH: "${MODEL_PATH:-/src/model/rf_model}"
+      REFERENCE_DATA_PATH: "${REFERENCE_DATA_PATH:-/data/raw/fraudTrain.csv}"
+      CHECKPOINT_LOCATION: "${CHECKPOINT_LOCATION:-/tmp/spark-checkpoints/fraud-stream}"
+      POSTGRES_HOST: "${POSTGRES_HOST:-postgres}"
+      POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
+      POSTGRES_DB: "${POSTGRES_DB:-streaming}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      POSTGRES_TABLE: "${POSTGRES_TABLE:-fraud_predictions}"
+      PROCESSING_TIME: "${PROCESSING_TIME:-10 seconds}"
+      SPARK_SQL_SHUFFLE_PARTITIONS: "${SPARK_SQL_SHUFFLE_PARTITIONS:-4}"
+    restart: unless-stopped
     networks:
       - spark-net
 
   postgres:
-    image: postgres:latest
+    image: postgres:16
     container_name: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: streaming
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      POSTGRES_DB: "${POSTGRES_DB:-streaming}"
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./src/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     networks:
       - spark-net
 
@@ -137,14 +150,20 @@ services:
       - postgres
       - spark-streaming
     ports:
-      - "8501:8501"
+      - "${STREAMLIT_PORT:-8501}:8501"
     environment:
-      - POSTGRES_HOST=postgres
+      POSTGRES_HOST: "${POSTGRES_HOST:-postgres}"
+      POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
+      POSTGRES_DB: "${POSTGRES_DB:-streaming}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+    restart: unless-stopped
     networks:
       - spark-net
 
 volumes:
   postgres_data:
+  spark_checkpoints:
 
 networks:
   spark-net:

@@ -1,7 +1,5 @@
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, hour, dayofweek, month, year, to_timestamp, radians, sin, cos, sqrt, asin
-from pyspark.sql.types import DoubleType
-from pyspark.sql.window import Window
 
 def calculate_distance(df):
     """Calculate distance between cardholder and merchant locations using Haversine formula."""
@@ -24,13 +22,20 @@ def extract_time_features(df):
              .withColumn("dob", to_timestamp("dob")) \
              .withColumn("age", (year("trans_date") - year("dob")))
 
-def compute_amt_vs_category_avg(df, static_avg):
+def clean_transaction_inputs(df):
+    """Drop invalid records before feature engineering."""
+    return df.dropna() \
+             .dropDuplicates(["trans_num"]) \
+             .filter(col("amt") >= 0) \
+             .filter(col("city_pop") >= 0)
+
+def compute_amt_vs_category_avg(df, static_avg, fallback_avg=70.0):
     """Calculate amount relative to average amount by category using a static lookup."""
     result_df = df.join(
         static_avg,
         df.category == static_avg.category,
         "left_outer"
     ) \
-    .withColumn("amt_vs_category_avg", col("amt") / F.coalesce(col("avg_amt"), F.lit(70.0))) \
+    .withColumn("amt_vs_category_avg", col("amt") / F.coalesce(col("avg_amt"), F.lit(float(fallback_avg)))) \
     .drop(static_avg.category, "avg_amt")
     return result_df

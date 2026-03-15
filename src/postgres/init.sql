@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS fraud_predictions (
+    trans_num VARCHAR(255),
     trans_date_trans_time VARCHAR(255),
     cc_num BIGINT,
     amt DOUBLE PRECISION,

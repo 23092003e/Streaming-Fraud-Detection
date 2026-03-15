@@ -52,7 +52,14 @@ git clone https://github.com/your-username/Streaming-Fraud-Detection.git
 cd Streaming-Fraud-Detection
 ```
 
-#### 2. Start all services
+#### 2. Create environment file
+Copy `.env.example` to `.env` and adjust values if needed:
+
+```bash
+cp .env.example .env
+```
+
+#### 3. Start all services
 All core services are defined in `docker-compose.yml` and can be started with:
 
 ```bash
@@ -94,6 +101,12 @@ By default the dashboard connects to PostgreSQL using the environment variables:
 - `POSTGRES_PORT` (default: `5432`)
 
 Make sure these values match the configuration in your `docker-compose.yml`.
+
+If you changed the PostgreSQL schema after the volume was already created, restart with a clean volume so `init.sql` is applied again:
+```bash
+docker-compose down -v
+docker-compose up -d
+```
 
 ---
 
