@@ -4,7 +4,7 @@ numpy==1.26.4
 pandas==2.1.4
 matplotlib==3.7.4
 scikit-learn==1.4.0
-searborn==0.13.2
+seaborn==0.13.2
 
 # Kafka dependencies
 kafka-python==2.0.2

@@ -1,4 +1,5 @@
-FROM bitnami/spark:3.5.0
+ARG SPARK_IMAGE=bitnamilegacy/spark:3.5.0
+FROM ${SPARK_IMAGE}
 
 USER root
 
