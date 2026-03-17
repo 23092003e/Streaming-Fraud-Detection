@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Spark streaming script and utils
 COPY ./src/spark/spark_streaming.py .
 COPY ./src/spark/spark_utils.py .
+COPY ./src/model/model_artifact_utils.py .
+COPY ./src/model/rf_model/ /opt/models/rf_model/
+RUN python /app/model_artifact_utils.py /opt/models/rf_model
 
 # Ensure Spark Kafka and PostgreSQL dependencies are available (aligned with Spark 3.5.0)
 RUN curl -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.5.0.jar \

@@ -51,7 +51,7 @@ def get_env(name, default):
 
 KAFKA_BOOTSTRAP_SERVERS = get_env("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 KAFKA_TOPIC = get_env("KAFKA_TOPIC", "transaction_data")
-MODEL_PATH = get_env("MODEL_PATH", "/src/model/rf_model")
+MODEL_PATH = get_env("MODEL_PATH", "/opt/models/rf_model")
 REFERENCE_DATA_PATH = get_env("REFERENCE_DATA_PATH", "/data/raw/fraudTrain.csv")
 CHECKPOINT_LOCATION = get_env("CHECKPOINT_LOCATION", "/tmp/spark-checkpoints/fraud-stream")
 POSTGRES_HOST = get_env("POSTGRES_HOST", "postgres")
